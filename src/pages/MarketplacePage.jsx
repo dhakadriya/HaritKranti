@@ -1,0 +1,174 @@
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getProducts } from "../redux/slices/productSlice";
+import { getCategories } from "../redux/slices/categorySlice";
+import ProductCard from "../components/ProductCard";
+import Loader from "../components/Loader";
+import { FaStore, FaSeedling } from "react-icons/fa";
+
+const MarketplacePage = () => {
+  const dispatch = useDispatch();
+  const { products = [], loading: productsLoading } = useSelector((state) => state.products || {});
+  const { categories = [], loading: categoriesLoading } = useSelector((state) => state.categories || {});
+
+  // UI state
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState("newest");
+
+  useEffect(() => {
+    // Fetch all farmer products that are listed in marketplace
+    dispatch(getProducts({ status: "available" }));
+    dispatch(getCategories());
+  }, [dispatch]);
+
+  // Show all farmer products that are listed and available
+  const allProducts = useMemo(() => {
+    return (products || []).map((p) => ({
+      ...p,
+      _id: p._id,
+      name: p.name || p.title,
+      title: p.title || p.name,
+      price: p.price || p.pricePerKg,
+      pricePerKg: p.pricePerKg || p.price,
+      quantity: p.quantity || p.quantityKg,
+      quantityAvailable: p.quantityAvailable || p.quantity || p.quantityKg,
+      category: p.category,
+      description: p.description,
+      images: p.images || (p.imageUrl ? [p.imageUrl] : []),
+      imageUrl: p.imageUrl || p.images?.[0],
+      unit: p.unit || "kg",
+      farmer: p.farmer || p.farmerId,
+      farmerId: p.farmerId || p.farmer?._id,
+    }));
+  }, [products]);
+
+  // Use categories from Redux state
+  const categoryOptions = useMemo(() => {
+    return ["all", ...categories.map(cat => cat._id)];
+  }, [categories]);
+
+  // Create category name map for display
+  const categoryNameMap = useMemo(() => {
+    const map = { all: "All Categories" };
+    categories.forEach(cat => {
+      map[cat._id] = cat.name;
+    });
+    return map;
+  }, [categories]);
+
+  // filter + sort the products
+  const filtered = useMemo(() => {
+    let arr = [...allProducts];
+
+    // filter by category
+    if (category !== "all") {
+      arr = arr.filter((p) => {
+        // Handle both ObjectId and string category
+        const productCategory = typeof p.category === 'object' ? p.category._id : p.category;
+        return productCategory === category;
+      });
+    }
+
+    // filter by search (name, description, or farmer name)
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      arr = arr.filter((p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q) ||
+        (p.farmer?.name || "").toLowerCase().includes(q)
+      );
+    }
+
+    // sorting
+    if (sort === "priceLowHigh") arr.sort((a, b) => (a.price || 0) - (b.price || 0));
+    else if (sort === "priceHighLow") arr.sort((a, b) => (b.price || 0) - (a.price || 0));
+    else if (sort === "rating") arr.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    else {
+      // newest: expect createdAt or _id fallback (if Mongo ObjectId, sort by timestamp using string compare)
+      arr.sort((a, b) => {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (da || db) return db - da;
+        // fallback: if _id is present and looks like ObjectId, newest last -> compare as strings
+        if (a._id && b._id) return b._id.localeCompare(a._id);
+        return 0;
+      });
+    }
+
+    return arr;
+  }, [allProducts, search, category, sort]);
+
+  const loading = productsLoading || categoriesLoading;
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-24">
+      <div className="text-center mb-8">
+        <FaStore className="text-green-500 text-5xl mx-auto mb-4" />
+        <h1 className="text-4xl font-bold mb-2">Direct Marketplace</h1>
+        <p className="text-lg text-gray-600">
+          Shop fresh fruits and vegetables directly from farmers at fair prices.
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center mb-8">
+        <input
+          type="text"
+          placeholder="Search products, farmers, or description..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 border rounded-md px-4 py-2 shadow-sm"
+        />
+
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="border rounded-md px-4 py-2"
+        >
+          {categoryOptions.map((c) => (
+            <option key={c} value={c}>
+              {categoryNameMap[c] || c}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="border rounded-md px-4 py-2"
+        >
+          <option value="newest">Newest</option>
+          <option value="priceLowHigh">Price: Low → High</option>
+          <option value="priceHighLow">Price: High → Low</option>
+          <option value="rating">Top Rated</option>
+        </select>
+      </div>
+
+      {/* Products grid */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {filtered.map((product) => (
+            <ProductCard key={product._id || product.id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <FaSeedling className="text-green-500 text-5xl mx-auto mb-4" />
+          <h3 className="text-2xl font-semibold mb-2">No Products Found</h3>
+          <p className="text-gray-600">
+            Try changing search terms, category, or sort options.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MarketplacePage;
