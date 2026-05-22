@@ -22,11 +22,13 @@ const OrderDetailPage = () => {
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [message, setMessage] = useState("");
 
-  const { order, loading } = useSelector((state) => state.orders);
+  const { order, loading, error } = useSelector((state) => state.orders);
   const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    dispatch(getOrderDetails(id));
+    if (id) {
+      dispatch(getOrderDetails(id));
+    }
   }, [dispatch, id]);
 
   const handleSendMessage = (e) => {
@@ -37,7 +39,7 @@ const OrderDetailPage = () => {
     }
 
     const receiverId =
-      user.role === "consumer" ? order.farmer._id : order.consumer._id;
+      user.role === "consumer" ? order.seller._id : order.consumer._id;
 
     dispatch(
       sendMessage({
@@ -60,22 +62,58 @@ const OrderDetailPage = () => {
   const getStatusBadgeClass = (status) => {
     switch (status) {
       case "pending":
-        return "badge-blue";
+        return "bg-yellow-100 text-yellow-800";
       case "accepted":
-        return "badge-green";
+        return "bg-green-100 text-green-800";
       case "rejected":
-        return "badge-red";
+        return "bg-red-100 text-red-800";
       case "completed":
-        return "badge-green";
+        return "bg-blue-100 text-blue-800";
       case "cancelled":
-        return "badge-red";
+        return "bg-gray-100 text-gray-800";
       default:
-        return "badge-blue";
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  if (loading || !order) {
+  if (loading) {
     return <Loader />;
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <h2 className="text-2xl font-bold text-red-800 mb-2">Error Loading Order</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <Link
+            to={`/${user?.role === 'farmer' ? 'farmer/' : ''}orders`}
+            className="inline-flex items-center text-green-600 hover:text-green-700"
+          >
+            <FaArrowLeft className="mr-2" />
+            Back to Orders
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <h2 className="text-2xl font-bold text-yellow-800 mb-2">Order Not Found</h2>
+          <p className="text-yellow-600 mb-4">The order you're looking for doesn't exist or you don't have permission to view it.</p>
+          <Link
+            to={`/${user?.role === 'farmer' ? 'farmer/' : ''}orders`}
+            className="inline-flex items-center text-green-600 hover:text-green-700"
+          >
+            <FaArrowLeft className="mr-2" />
+            Back to Orders
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -89,237 +127,334 @@ const OrderDetailPage = () => {
       </Link>
 
       <div className="bg-white shadow-lg rounded-2xl mb-8 overflow-hidden">
-        <div className="p-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-3 text-gray-800">
-                Order #{order._id.substring(0, 8)}
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div className="text-white">
+              <h1 className="text-3xl font-bold mb-2">
+                Order #{order._id.substring(0, 8).toUpperCase()}
               </h1>
-              <p className="text-gray-500">
-                Placed on {formatDate(order.createdAt)}
-              </p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <FaCalendarAlt />
+                  <span>Placed on {formatDate(order.createdAt)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FaClock />
+                  <span>{new Date(order.createdAt).toLocaleTimeString()}</span>
+                </div>
+              </div>
             </div>
             <div className="mt-4 md:mt-0">
               <span
-                className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusBadgeClass(
+                className={`px-6 py-3 rounded-full text-sm font-bold shadow-lg ${getStatusBadgeClass(
                   order.status
-                )}`}
+                )} bg-white`}
               >
                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
               </span>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div className="bg-gray-50 p-6 rounded-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">
-                Order Details
-              </h2>
-              <div className="space-y-4">
+        <div className="p-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Order Summary Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+              <h3 className="text-sm font-semibold text-blue-800 mb-3 uppercase tracking-wide">
+                Order Summary
+              </h3>
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-bold text-lg text-gray-800">
+                  <span className="text-gray-700">Items:</span>
+                  <span className="font-bold text-gray-900">{order.items.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Total Amount:</span>
+                  <span className="font-bold text-xl text-blue-600">
                     ₨{order.totalAmount.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Payment Method:</span>
-                  <span className="capitalize font-medium text-gray-800">
+                  <span className="text-gray-700">Payment:</span>
+                  <span className="capitalize font-medium text-gray-900">
                     {order.paymentMethod.replace("_", " ")}
                   </span>
                 </div>
-                {order.notes && (
-                  <div className="mt-4">
-                    <span className="text-gray-600 block mb-2">Notes:</span>
-                    <p className="text-gray-700 bg-white p-3 rounded-lg border border-gray-200">
-                      {order.notes}
+              </div>
+            </div>
+
+            {/* Customer Info Card */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+              <h3 className="text-sm font-semibold text-purple-800 mb-3 uppercase tracking-wide">
+                Customer Information
+              </h3>
+              <div className="space-y-2">
+                <p className="font-bold text-gray-900">{order.consumer.name}</p>
+                <p className="text-gray-700 text-sm">{order.consumer.email}</p>
+                {order.consumer.phone && (
+                  <p className="text-gray-700 text-sm">{order.consumer.phone}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Farmer/Seller Info Card */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+              <h3 className="text-sm font-semibold text-green-800 mb-3 uppercase tracking-wide">
+                {order.sellerType === 'admin' ? 'Seller' : 'Farmer'} Information
+              </h3>
+              <div className="space-y-2">
+                <p className="font-bold text-gray-900">{order.seller.name}</p>
+                <p className="text-gray-700 text-sm">{order.seller.email}</p>
+                {order.seller.phone && (
+                  <p className="text-gray-700 text-sm">{order.seller.phone}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Delivery/Pickup Details */}
+          <div className="bg-gray-50 p-6 rounded-xl">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
+              <FaMapMarkerAlt className="text-green-600" />
+              {order.pickupDetails && order.pickupDetails.location
+                ? "Pickup Details"
+                : "Delivery Details"}
+            </h2>
+            {order.pickupDetails && order.pickupDetails.location ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                  <FaMapMarkerAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Location</p>
+                    <p className="text-gray-700 font-medium">
+                      {order.pickupDetails.location}
                     </p>
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-6 rounded-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">
-                {order.pickupDetails && order.pickupDetails.location
-                  ? "Pickup Details"
-                  : "Delivery Details"}
-              </h2>
-              {order.pickupDetails && order.pickupDetails.location ? (
-                <div className="space-y-4">
-                  <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                    <FaMapMarkerAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
-                    <span className="text-gray-700">
-                      {order.pickupDetails.location}
-                    </span>
-                  </div>
-                  {order.pickupDetails.date && (
-                    <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                      <FaCalendarAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        {formatDate(order.pickupDetails.date)}
-                      </span>
-                    </div>
-                  )}
-                  {order.pickupDetails.time && (
-                    <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                      <FaClock className="text-green-500 mt-1 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        {order.pickupDetails.time}
-                      </span>
-                    </div>
-                  )}
                 </div>
-              ) : order.deliveryDetails && order.deliveryDetails.address ? (
-                <div className="space-y-4">
-                  <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                    <FaMapMarkerAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                {order.pickupDetails.date && (
+                  <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                    <FaCalendarAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
                     <div>
-                      <p className="text-gray-700">
-                        {order.deliveryDetails.address.street}
-                      </p>
-                      <p className="text-gray-700">
-                        {order.deliveryDetails.address.city},{" "}
-                        {order.deliveryDetails.address.state}{" "}
-                        {order.deliveryDetails.address.zipCode}
+                      <p className="text-xs text-gray-500 mb-1">Date</p>
+                      <p className="text-gray-700 font-medium">
+                        {formatDate(order.pickupDetails.date)}
                       </p>
                     </div>
                   </div>
-                  {order.deliveryDetails.date && (
-                    <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                      <FaCalendarAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        {formatDate(order.deliveryDetails.date)}
-                      </span>
+                )}
+                {order.pickupDetails.time && (
+                  <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                    <FaClock className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Time</p>
+                      <p className="text-gray-700 font-medium">
+                        {order.pickupDetails.time}
+                      </p>
                     </div>
-                  )}
-                  {order.deliveryDetails.time && (
-                    <div className="flex items-start bg-white p-3 rounded-lg border border-gray-200">
-                      <FaClock className="text-green-500 mt-1 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        {order.deliveryDetails.time}
-                      </span>
-                    </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            ) : order.deliveryDetails && order.deliveryDetails.address ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                  <FaMapMarkerAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Address</p>
+                    <p className="text-gray-700 font-medium">
+                      {order.deliveryDetails.address.street}
+                    </p>
+                    <p className="text-gray-700">
+                      {order.deliveryDetails.address.city},{" "}
+                      {order.deliveryDetails.address.state}{" "}
+                      {order.deliveryDetails.address.zipCode}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-gray-500 italic">
-                  No delivery/pickup details provided
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 p-6 rounded-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">
-                Customer Information
-              </h2>
-              <div className="space-y-2">
-                <p className="font-medium text-gray-800">
-                  {order.consumer.name}
-                </p>
-                <p className="text-gray-600">{order.consumer.email}</p>
-                {order.consumer.phone && (
-                  <p className="text-gray-600">{order.consumer.phone}</p>
+                {order.deliveryDetails.date && (
+                  <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                    <FaCalendarAlt className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Date</p>
+                      <p className="text-gray-700 font-medium">
+                        {formatDate(order.deliveryDetails.date)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {order.deliveryDetails.time && (
+                  <div className="flex items-start bg-white p-4 rounded-lg border border-gray-200">
+                    <FaClock className="text-green-500 mt-1 mr-3 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Time</p>
+                      <p className="text-gray-700 font-medium">
+                        {order.deliveryDetails.time}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-
-            <div className="bg-gray-50 p-6 rounded-xl">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">
-                Farmer Information
-              </h2>
-              <div className="space-y-2">
-                <p className="font-medium text-gray-800">{order.farmer.name}</p>
-                <p className="text-gray-600">{order.farmer.email}</p>
-                {order.farmer.phone && (
-                  <p className="text-gray-600">{order.farmer.phone}</p>
-                )}
-              </div>
-            </div>
+            ) : (
+              <p className="text-gray-500 italic">
+                No delivery/pickup details provided
+              </p>
+            )}
           </div>
+
+          {/* Order Notes */}
+          {order.notes && (
+            <div className="mt-6 bg-yellow-50 border border-yellow-200 p-6 rounded-xl">
+              <h3 className="text-sm font-semibold text-yellow-800 mb-2 uppercase tracking-wide">
+                Order Notes
+              </h3>
+              <p className="text-gray-700">{order.notes}</p>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="bg-white shadow-lg rounded-2xl mb-8 overflow-hidden">
         <div className="p-8">
           <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-            Order Items
+            Order Items ({order.items.length} {order.items.length === 1 ? 'item' : 'items'})
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-4 px-4 text-gray-600 font-semibold">
-                    Product
-                  </th>
-                  <th className="text-center py-4 px-4 text-gray-600 font-semibold">
-                    Price
-                  </th>
-                  <th className="text-center py-4 px-4 text-gray-600 font-semibold">
-                    Quantity
-                  </th>
-                  <th className="text-right py-4 px-4 text-gray-600 font-semibold">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((item) => (
-                  <tr
-                    key={item._id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150"
-                  >
-                    <td className="py-4 px-4">
-                      <div className="flex items-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden mr-4">
-                          {item.product.images &&
-                          item.product.images.length > 0 ? (
-                            <img
-                              src={item.product.images[0] || "/placeholder.svg"}
-                              alt={item.product.title || item.product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <FaLeaf className="text-green-500 text-2xl" />
-                            </div>
+          
+          {/* Product Cards for Better Visibility */}
+          <div className="space-y-4 mb-6">
+            {order.items.map((item, index) => {
+              // Get product data from either product or adminProduct
+              const productData = item.product || item.adminProduct;
+              const productName = item.name || productData?.name || productData?.title || 'Unknown Product';
+              const productDescription = productData?.description || '';
+              const productImages = productData?.images || [];
+              const productCategory = productData?.category;
+              const isOrganic = productData?.isOrganic || false;
+              
+              return (
+                <div
+                  key={item._id}
+                  className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* Product Image */}
+                    <div className="w-full md:w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      {productImages && productImages.length > 0 ? (
+                        <img
+                          src={productImages[0] || "/placeholder.svg"}
+                          alt={productName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <FaLeaf className="text-green-500 text-4xl" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product Details */}
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-800 mb-1">
+                            {productName}
+                          </h3>
+                          {productDescription && (
+                            <p className="text-gray-600 text-sm line-clamp-2">
+                              {productDescription}
+                            </p>
                           )}
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {item.product.title || item.product.name}
+                        <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                          Item #{index + 1}
+                        </span>
+                      </div>
+
+                      {/* Product Info Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-xs text-gray-500 mb-1">Unit Price</p>
+                          <p className="text-lg font-semibold text-gray-800">
+                            ₨{item.price.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-xs text-gray-500 mb-1">Quantity</p>
+                          <p className="text-lg font-semibold text-gray-800">
+                            {item.quantity} {item.unit || 'kg'}
+                          </p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg col-span-2">
+                          <p className="text-xs text-green-600 mb-1">Subtotal</p>
+                          <p className="text-xl font-bold text-green-600">
+                            ₨{(item.price * item.quantity).toFixed(2)}
                           </p>
                         </div>
                       </div>
-                    </td>
-                    <td className="text-center py-4 px-4 text-gray-700">
-                      ₨{item.price.toFixed(2)}
-                    </td>
-                    <td className="text-center py-4 px-4 text-gray-700">
-                      {item.quantity}
-                    </td>
-                    <td className="text-right py-4 px-4 font-medium text-gray-800">
-                      ₨{(item.price * item.quantity).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td
-                    colSpan="3"
-                    className="text-right py-4 px-4 font-bold text-gray-800"
-                  >
-                    Total:
-                  </td>
-                  <td className="text-right py-4 px-4 font-bold text-gray-800">
-                    ₨{order.totalAmount.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+
+                      {/* Additional Product Info */}
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {productCategory && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                            {typeof productCategory === 'object' 
+                              ? productCategory.name 
+                              : productCategory}
+                          </span>
+                        )}
+                        {isOrganic && (
+                          <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full flex items-center gap-1">
+                            <FaLeaf className="text-xs" />
+                            Organic
+                          </span>
+                        )}
+                        {item.unit && (
+                          <span className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                            Unit: {item.unit}
+                          </span>
+                        )}
+                        {item.adminProduct && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full">
+                            Marketplace Product
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Order Summary */}
+          <div className="border-t-2 border-gray-200 pt-6">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="text-base">Subtotal ({order.items.length} items):</span>
+                  <span className="text-lg font-medium">
+                    ₨{order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}
+                  </span>
+                </div>
+                {order.deliveryFee && (
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="text-base">Delivery Fee:</span>
+                    <span className="text-lg font-medium">₨{order.deliveryFee.toFixed(2)}</span>
+                  </div>
+                )}
+                {order.discount && (
+                  <div className="flex justify-between items-center text-green-600">
+                    <span className="text-base">Discount:</span>
+                    <span className="text-lg font-medium">-₨{order.discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="border-t-2 border-green-200 pt-3 mt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xl font-bold text-gray-800">Total Amount:</span>
+                    <span className="text-2xl font-bold text-green-600">
+                      ₨{order.totalAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -327,7 +462,7 @@ const OrderDetailPage = () => {
       <div className="bg-white shadow-lg rounded-2xl overflow-hidden">
         <div className="p-8">
           <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-            Contact {user.role === "consumer" ? "Farmer" : "Customer"}
+            Contact {user.role === "consumer" ? (order.sellerType === 'admin' ? "Seller" : "Farmer") : "Customer"}
           </h2>
           {showMessageForm ? (
             <form onSubmit={handleSendMessage} className="space-y-4">
@@ -336,7 +471,7 @@ const OrderDetailPage = () => {
                 onChange={(e) => setMessage(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 placeholder={`Write your message to the ${
-                  user.role === "consumer" ? "farmer" : "customer"
+                  user.role === "consumer" ? (order.sellerType === 'admin' ? "seller" : "farmer") : "customer"
                 }...`}
                 rows="4"
                 required
@@ -365,7 +500,7 @@ const OrderDetailPage = () => {
               <FaComment className="text-xl" />
               <span className="font-medium">
                 Send a message about this order to the{" "}
-                {user.role === "consumer" ? "farmer" : "customer"}
+                {user.role === "consumer" ? (order.sellerType === 'admin' ? "seller" : "farmer") : "customer"}
               </span>
             </button>
           )}
